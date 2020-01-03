@@ -1,33 +1,42 @@
-import { fusebox, sparky } from "fuse-box";
+import { FuseBox, WebIndexPlugin, SassPlugin, CSSPlugin } from "fuse-box";
 
-class Context {
-  runServer;
-  getConfig = () =>
-    fusebox({
-      target: "browser",
-      entry: "src/index.tsx",
-      webIndex: {
-        template: "src/index.html"
-      },
-      cache : true,
-      devServer: this.runServer
-    });
-}
-const { task } = sparky<Context>(Context);
+const fuse = FuseBox.init({
+  homeDir: "src",
+  target: "browser@es6",
+  output: "dist/$name.js",
+  plugins: [
+      WebIndexPlugin({
+          templateString: `<!DOCTYPE html>
+<html>
 
-task("default", async ctx => {
-  ctx.runServer = true;
-  const fuse = ctx.getConfig();
-  await fuse.runDev();
+<head>
+  <title></title>
+  $css
+</head>
+
+<body>
+  <div id="root"></div>
+  $bundles
+</body>
+
+</html>`
+      }),
+      [SassPlugin(), CSSPlugin()],
+  ],
+  cache: false,
 });
 
-task("preview", async ctx => {
-  ctx.runServer = true;
-  const fuse = ctx.getConfig();
-  await fuse.runProd({ uglify: false });
-});
-task("dist", async ctx => {
-  ctx.runServer = false;
-  const fuse = ctx.getConfig();
-  await fuse.runProd({ uglify: false });
-});
+fuse.dev({ port: 4444 });
+
+fuse.bundle("vendor")
+  .instructions(" ~ index.tsx")
+  .sourceMaps(true) // does not work
+  .hmr();
+
+fuse.bundle("app")
+  .instructions(" !> [index.tsx]")
+  .sourceMaps(true)
+  .watch()
+  .hmr({ reload: true }); // monkey patch
+
+fuse.run();
